@@ -11,7 +11,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Insert your OpenRouter API key here
-OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY', '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')
+OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY')
 
 def encode_image_to_base64(image_file):
     """Convert uploaded image to base64 string"""

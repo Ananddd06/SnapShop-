@@ -48,7 +48,7 @@ Be conversational, helpful, and specific in your responses. If you can see a pro
 
     messages.push({
       role: 'user',
-      content: userContent
+      content: userContent.length === 1 ? userContent[0].text : userContent
     })
 
     // API request

@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-const OPENROUTER_API_KEY = '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'
-
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData()
@@ -38,7 +36,7 @@ Focus on:
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+        'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
         'HTTP-Referer': 'https://productfinder.com',
         'X-Title': 'Product Finder',
         'Content-Type': 'application/json'

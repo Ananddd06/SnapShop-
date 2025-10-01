@@ -84,6 +84,9 @@ export default function ProductFinder() {
     reader.onload = (e) => {
       setSelectedImage(e.target?.result as string)
       setResult(null)
+      // Reset chat when new image is uploaded
+      setChatMessages([])
+      setShowChat(false)
     }
     reader.readAsDataURL(file)
   }
@@ -141,6 +144,13 @@ export default function ProductFinder() {
       setResult(data)
       saveToHistory(selectedImage, data)
       
+      // Auto-open chat and add welcome message
+      setShowChat(true)
+      setChatMessages([{
+        role: 'assistant',
+        content: `I can see you've uploaded an image of "${data.title}" by ${data.brand}. I'm ready to help you with any questions about this product! You can ask me about features, pricing, alternatives, or where to buy it.`
+      }])
+      
       toast({
         title: "Analysis Complete!",
         description: `Found: ${data.title} with ${Math.round(data.confidence * 100)}% confidence`
@@ -170,7 +180,8 @@ export default function ProductFinder() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: userMessage,
-          context: result
+          context: result,
+          image: selectedImage // Pass the uploaded image to chat
         })
       })
 
@@ -480,23 +491,83 @@ export default function ProductFinder() {
                   exit={{ opacity: 0, height: 0 }}
                 >
                   <Card className="bg-white/5 backdrop-blur-xl border border-white/10 shadow-2xl rounded-2xl">
-                    <CardHeader>
-                      <CardTitle className="text-white flex items-center gap-2">
-                        <MessageCircle className="w-5 h-5" />
+                    <CardHeader className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 border-b border-white/10">
+                      <CardTitle className="text-white flex items-center gap-3">
+                        <div className="p-2 rounded-lg bg-gradient-to-r from-blue-500 to-purple-500">
+                          <MessageCircle className="w-5 h-5 text-white" />
+                        </div>
                         AI Shopping Assistant
+                        {selectedImage && (
+                          <div className="ml-auto flex items-center gap-2 text-sm text-gray-300">
+                            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                            Image Loaded
+                          </div>
+                        )}
                       </CardTitle>
                       <CardDescription className="text-gray-300">
-                        Ask questions about products, shopping, or get recommendations
+                        {selectedImage 
+                          ? "Ask me anything about the uploaded product image!" 
+                          : "Upload an image first to start a visual conversation"
+                        }
                       </CardDescription>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="p-6">
                       <div className="space-y-4">
+                        {/* Image Preview in Chat */}
+                        {selectedImage && (
+                          <motion.div
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            className="flex items-center gap-3 p-3 bg-white/5 rounded-xl border border-white/10"
+                          >
+                            <img
+                              src={selectedImage}
+                              alt="Current product"
+                              className="w-12 h-12 rounded-lg object-cover border border-white/20"
+                            />
+                            <div className="flex-1">
+                              <p className="text-white text-sm font-medium">
+                                {result?.title || "Product Image Loaded"}
+                              </p>
+                              <p className="text-gray-400 text-xs">
+                                I can see this image and answer questions about it
+                              </p>
+                            </div>
+                          </motion.div>
+                        )}
+
                         {/* Chat Messages */}
-                        <div className="h-64 overflow-y-auto space-y-3 p-4 bg-white/5 rounded-xl">
+                        <div className="h-80 overflow-y-auto space-y-4 p-4 bg-white/5 rounded-xl border border-white/10 chat-scroll">
                           {chatMessages.length === 0 ? (
-                            <div className="text-center text-gray-400 py-8">
-                              <MessageCircle className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                              <p>Start a conversation! Ask me about products or shopping.</p>
+                            <div className="text-center text-gray-400 py-12">
+                              <MessageCircle className="w-16 h-16 mx-auto mb-4 opacity-30" />
+                              {selectedImage ? (
+                                <div className="space-y-2">
+                                  <p className="text-lg font-medium">Ready to chat about your image!</p>
+                                  <p className="text-sm">Try asking:</p>
+                                  <div className="flex flex-wrap gap-2 justify-center mt-3">
+                                    {[
+                                      "What is this product?",
+                                      "Where can I buy this?",
+                                      "What are similar products?",
+                                      "Tell me about this item"
+                                    ].map((suggestion, i) => (
+                                      <button
+                                        key={i}
+                                        onClick={() => setChatInput(suggestion)}
+                                        className="px-3 py-1 bg-white/10 hover:bg-white/20 rounded-lg text-xs transition-colors border border-white/20"
+                                      >
+                                        {suggestion}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="space-y-2">
+                                  <p className="text-lg">Upload an image to start chatting!</p>
+                                  <p className="text-sm">I can help you identify products, compare prices, and answer shopping questions.</p>
+                                </div>
+                              )}
                             </div>
                           ) : (
                             chatMessages.map((msg, index) => (
@@ -506,14 +577,26 @@ export default function ProductFinder() {
                                 animate={{ opacity: 1, y: 0 }}
                                 className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                               >
-                                <div
-                                  className={`max-w-[80%] p-3 rounded-xl ${
-                                    msg.role === 'user'
-                                      ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white'
-                                      : 'bg-white/10 text-gray-100 border border-white/20'
-                                  }`}
-                                >
-                                  <p className="text-sm">{msg.content}</p>
+                                <div className="flex items-start gap-3 max-w-[85%]">
+                                  {msg.role === 'assistant' && (
+                                    <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center flex-shrink-0 mt-1">
+                                      <MessageCircle className="w-4 h-4 text-white" />
+                                    </div>
+                                  )}
+                                  <div
+                                    className={`p-4 rounded-2xl ${
+                                      msg.role === 'user'
+                                        ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-br-md'
+                                        : 'bg-white/10 text-gray-100 border border-white/20 rounded-bl-md'
+                                    }`}
+                                  >
+                                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+                                  </div>
+                                  {msg.role === 'user' && (
+                                    <div className="w-8 h-8 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center flex-shrink-0 mt-1">
+                                      <span className="text-white text-xs font-bold">U</span>
+                                    </div>
+                                  )}
                                 </div>
                               </motion.div>
                             ))
@@ -524,11 +607,16 @@ export default function ProductFinder() {
                               animate={{ opacity: 1 }}
                               className="flex justify-start"
                             >
-                              <div className="bg-white/10 border border-white/20 p-3 rounded-xl">
-                                <div className="flex space-x-1">
-                                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce animation-delay-200"></div>
-                                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce animation-delay-400"></div>
+                              <div className="flex items-start gap-3">
+                                <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center">
+                                  <MessageCircle className="w-4 h-4 text-white" />
+                                </div>
+                                <div className="bg-white/10 border border-white/20 p-4 rounded-2xl rounded-bl-md">
+                                  <div className="flex space-x-2">
+                                    <div className="w-2 h-2 bg-gray-400 rounded-full typing-dot"></div>
+                                    <div className="w-2 h-2 bg-gray-400 rounded-full typing-dot"></div>
+                                    <div className="w-2 h-2 bg-gray-400 rounded-full typing-dot"></div>
+                                  </div>
                                 </div>
                               </div>
                             </motion.div>
@@ -536,23 +624,39 @@ export default function ProductFinder() {
                         </div>
                         
                         {/* Chat Input */}
-                        <div className="flex gap-2">
-                          <input
-                            type="text"
-                            value={chatInput}
-                            onChange={(e) => setChatInput(e.target.value)}
-                            onKeyPress={(e) => e.key === 'Enter' && sendChatMessage()}
-                            placeholder="Ask about products, prices, alternatives..."
-                            className="flex-1 px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                          />
+                        <div className="flex gap-3">
+                          <div className="flex-1 relative">
+                            <input
+                              type="text"
+                              value={chatInput}
+                              onChange={(e) => setChatInput(e.target.value)}
+                              onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && sendChatMessage()}
+                              placeholder={selectedImage ? "Ask me about this product..." : "Upload an image first to chat"}
+                              disabled={!selectedImage}
+                              className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+                            />
+                            {selectedImage && (
+                              <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                              </div>
+                            )}
+                          </div>
                           <Button
                             onClick={sendChatMessage}
-                            disabled={!chatInput.trim() || isChatLoading}
-                            className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 px-6 rounded-xl"
+                            disabled={!chatInput.trim() || isChatLoading || !selectedImage}
+                            className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 px-6 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed h-12"
                           >
                             <Send className="w-4 h-4" />
                           </Button>
                         </div>
+                        
+                        {!selectedImage && (
+                          <div className="text-center p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-xl">
+                            <p className="text-yellow-300 text-sm">
+                              💡 Upload a product image above to start a visual conversation with AI!
+                            </p>
+                          </div>
+                        )}
                       </div>
                     </CardContent>
                   </Card>

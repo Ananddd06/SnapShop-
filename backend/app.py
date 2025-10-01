@@ -167,9 +167,100 @@ Focus on:
         traceback.print_exc()
         return jsonify({'error': f'Server error: {str(e)}'}), 500
 
+@app.route('/chat', methods=['POST'])
+def chat_with_image():
+    try:
+        data = request.get_json()
+        message = data.get('message', '')
+        context = data.get('context', {})
+        image_base64 = data.get('image', '')
+        
+        if not message:
+            return jsonify({'error': 'No message provided'}), 400
+        
+        # Build context-aware system prompt
+        system_prompt = """You are a helpful AI shopping assistant. You can see and analyze product images and help users with shopping decisions, product information, comparisons, and recommendations.
+
+Key capabilities:
+- Analyze product images in detail
+- Provide shopping advice and recommendations
+- Compare products and suggest alternatives
+- Answer questions about product features, pricing, and availability
+- Help with product selection based on user needs
+
+Be conversational, helpful, and specific in your responses. If you can see a product image, describe what you observe and provide relevant insights."""
+
+        # Prepare messages for the API
+        messages = [
+            {
+                "role": "system",
+                "content": system_prompt
+            }
+        ]
+        
+        # Add context if available
+        if context:
+            context_text = f"Current product context: {context.get('title', 'Unknown')} by {context.get('brand', 'Unknown')} in {context.get('category', 'Unknown')} category."
+            messages.append({
+                "role": "assistant",
+                "content": f"I can see you're looking at: {context_text}"
+            })
+        
+        # Add user message with image if available
+        user_content = [{"type": "text", "text": message}]
+        if image_base64:
+            user_content.append({
+                "type": "image_url",
+                "image_url": {"url": image_base64}
+            })
+        
+        messages.append({
+            "role": "user",
+            "content": user_content
+        })
+        
+        # API request headers
+        headers = {
+            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+            "HTTP-Referer": "https://productfinder.com",
+            "X-Title": "Product Finder Chat",
+            "Content-Type": "application/json"
+        }
+        
+        payload = {
+            "model": "x-ai/grok-vision-beta",
+            "messages": messages,
+            "max_tokens": 800,
+            "temperature": 0.7
+        }
+        
+        # Make API call
+        response = requests.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers=headers,
+            json=payload,
+            timeout=30
+        )
+        
+        if response.status_code != 200:
+            return jsonify({'error': f'Chat API failed: {response.status_code}'}), 500
+        
+        api_response = response.json()
+        
+        if 'choices' not in api_response or not api_response['choices']:
+            return jsonify({'error': 'Invalid chat response'}), 500
+        
+        reply = api_response['choices'][0]['message']['content'].strip()
+        
+        return jsonify({'reply': reply})
+        
+    except Exception as e:
+        print(f"Error in chat_with_image: {str(e)}")
+        return jsonify({'error': f'Chat error: {str(e)}'}), 500
+
 @app.route('/health', methods=['GET'])
 def health_check():
     return jsonify({'status': 'healthy', 'message': 'Product Finder API is running'})
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5001)
+    app.run(debug=True, host='0.0.0.0', port=5000)
